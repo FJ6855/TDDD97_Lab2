@@ -16,31 +16,49 @@ def closeDatabaseConnection():
     if databaseConnection is not None: 
         databaseConnection.close()
 
-def getUserByPassword(email, passwordHash):
+def executeSelect(sql, args, one = True):
     cursor = databaseConnection.cursor()
-    cursor.execute('select * from users where email = ? and password = ?', (email, passwordHash))
-    result = cursor.fetchone()
+    cursor.execute(sql, args)
+    if one:
+        result = cursor.fetchone()
+    else:
+        result = cursor.fetchall()
     cursor.close()
     return result
+
+def executeChange(sql, args):
+    cursor = databaseConnection.cursor()
+    cursor.execute(sql, args)
+    databaseConnection.commit()
+    cursor.close()
+    return True
+
+def getUserByPassword(email, passwordHash):
+    return executeSelect('select * from users where email = ? and password = ?', (email, passwordHash))
 
 def getUserByEmail(email):
-    cursor = databaseConnection.cursor()
-    cursor.execute('select * from users where email = ?', (email,))
-    result = cursor.fetchone()
-    cursor.close()
-    return result
+    return executeSelect('select email, firstName, lastName, gender, city, country from users where email = ?', (email,))
 
-def insertSignedInUser(token, email):
-    cursor = databaseConnection.cursor()
-    cursor.execute('insert into signedInUsers values (?, ?)', (token, email))
-    databaseConnection.commit()
-    cursor.close()
-    return True
+def getUserPasswordByEmail(email):    
+    return executeSelect('select password from users where email = ?', (email,))
+    
+def getUserEmailByToken(token):
+    return executeSelect('select email from signedInUsers where token = ?', (token,))
+
+def getUserMessagesByEmail(email):
+    return executeSelect('select * from messages where wallEmail = ?', (email,))
 
 def insertUser(email, firstName, lastName, gender, city, country, passwordHash):
-    cursor = databaseConnection.cursor()
-    cursor.execute('insert into users values (?, ?, ?, ?, ?, ?, ?)', (email, passwordHash, firstName, lastName, gender, city, country))
-    databaseConnection.commit()
-    cursor.close()
-    return True
+    return executeChange('insert into users values (?, ?, ?, ?, ?, ?, ?)', (email, passwordHash, firstName, lastName, gender, city, country))
 
+def insertSignedInUser(token, email):
+    return executeChange('insert into signedInUsers values (?, ?)', (token, email))
+
+def insertMessage(writerEmail, email, message):
+    return executeChange('insert into messages (message, wallEmail, writer) values (?, ?, ?)', (message, email, writerEmail))
+
+def deleteSignedInUser(token):
+    return executeChange('delete from signedInUsers where token = ?', (token,))
+
+def updateUserPassword(email, passwordHash):
+    return executeChange('update users set password = ? where email = ?', (passwordHash, email))
