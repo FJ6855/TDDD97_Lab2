@@ -16,7 +16,7 @@ def closeDatabaseConnection():
     if databaseConnection is not None: 
         databaseConnection.close()
 
-def executeSelect(sql, args, one = True):
+def executeSelect(sql, args, one = False):
     cursor = databaseConnection.cursor()
     cursor.execute(sql, args)
     if one:
@@ -33,17 +33,22 @@ def executeChange(sql, args):
     cursor.close()
     return True
 
-def getUserByPassword(email, passwordHash):
-    return executeSelect('select * from users where email = ? and password = ?', (email, passwordHash))
-
 def getUserByEmail(email):
-    return executeSelect('select email, firstName, lastName, gender, city, country from users where email = ?', (email,))
+    return executeSelect('select email, firstName, lastName, gender, city, country from users where email = ?', (email,), True)
 
 def getUserPasswordByEmail(email):    
-    return executeSelect('select password from users where email = ?', (email,))
-    
+    password = executeSelect('select password from users where email = ?', (email,), True)
+    if password is not None:
+        return password[0]
+    else:
+        return None
+
 def getUserEmailByToken(token):
-    return executeSelect('select email from signedInUsers where token = ?', (token,))
+    email = executeSelect('select email from signedInUsers where token = ?', (token,), True)
+    if email is not None:
+        return email[0]
+    else:
+        return None
 
 def getUserMessagesByEmail(email):
     return executeSelect('select * from messages where wallEmail = ?', (email,))

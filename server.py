@@ -50,16 +50,12 @@ def validLogin(email, password):
         else:
             return False    
 
-def validEmail(email):
+def emailExists(email):
     user = database_helper.getUserByEmail(email)
     if user is None:
-        return True
-    else:
         return False
-
-@app.route('/')
-def main():
-    return "Hello"
+    else:
+        return True
 
 @app.route('/sign_in', methods=['POST'])
 def signIn():
@@ -77,7 +73,7 @@ def signIn():
 def signUp():
     form = SignUpForm(request.form)
     if form.validate():
-        if validEmail(request.form['signupEmail']):
+        if emailExists(request.form['signupEmail']) == False:
             passwordHash = bcrypt.generate_password_hash(request.form['signupPassword'])
             result = database_helper.insertUser(request.form['signupEmail'], request.form['firstName'], request.form['lastName'], request.form['gender'], request.form['city'], request.form['country'], passwordHash)
             if result == True:            
@@ -109,7 +105,7 @@ def changePassword(token):
         if email is not None:
             if validLogin(email[0], request.form['oldPassword']):
                 passwordHash = bcrypt.generate_password_hash(request.form['newPassword'])
-                result = database_helper.updateUserPassword(email[0], passwordHash)
+                result = database_helper.updateUserPassword(email, passwordHash)
                 if result == True:
                     return json.dumps({'success': True, 'message': 'Password changed.'}), 200
                 else:
@@ -117,20 +113,16 @@ def changePassword(token):
             else:
                 return json.dumps({'success': False, 'message': 'Wrong password.'}), 404
         else:
-            return json.dumps({'success': False, 'message': 'You are not logged in.'}), 404
+            return json.dumps({'success': False, 'message': 'You are not signed in.'}), 404
     else:
         return json.dumps({'success': False, 'message': 'Form data missing or incorrect type.'}), 404
             
-@app.route('/get_user_data_by_token/<token>', methods=['GET'])
-def getUserDataByToken(token):
-    email = database_helper.getUserEmailByToken(token)
-    if email is not None:
-        return getUserDataByEmail(token, email[0])
-    else:
-        return json.dumps({'success': False, 'message': 'You are not signed in.'}), 404
+@app.route('/get_user_data/<token>', defaults={'email': None}, methods=['GET'])
+@app.route('/get_user_data/<token>/<email>', methods=['GET'])
+def getUserData(token, email):
+    if email is None:
+        email = database_helper.getUserEmailByToken(token)
 
-@app.route('/get_user_data_by_email/<token>/<email>', methods=['GET'])
-def getUserDataByEmail(token, email):
     signedInEmail = database_helper.getUserEmailByToken(token)
     if signedInEmail is not None:
         user = database_helper.getUserByEmail(email)
@@ -141,20 +133,16 @@ def getUserDataByEmail(token, email):
     else:
         return json.dumps({'success': False, 'message': 'You are not signed in.'}), 404
 
-@app.route('/get_user_messages_by_token/<token>', methods=['GET'])
-def getUserMessagesByToken(token):
-    signedInEmail = database_helper.getUserEmailByToken(token)
-    if signedInEmail is not None:
-        return getUserMessagesByEmail(token, signedInEmail[0])
-    else:
-        return json.dumps({'success': False, 'message': 'You are not signed in.'}), 404
-
-@app.route('/get_user_messages_by_email/<token>/<email>', methods=['GET'])
+@app.route('/get_user_messages/<token>', defaults={'email': None}, methods=['GET'])
+@app.route('/get_user_messages/<token>/<email>', methods=['GET'])
 def getUserMessagesByEmail(token, email):
+    if email is None:
+        email = database_helper.getUserEmailByToken(token)
+
     signedInEmail = database_helper.getUserEmailByToken(token)
     if signedInEmail is not None:
-        messages = database_helper.getUserMessagesByEmail(email)
-        if validEmail(email) == False:
+        if emailExists(email):
+            messages = database_helper.getUserMessagesByEmail(email)
             messagesList = []
             for message in messages:
                 messagesList.append({'messageId': message[0], 'message': message[1], 'datePosted': message[2], 'wallEmail': message[3], 'writer': message[4]})
@@ -168,9 +156,9 @@ def getUserMessagesByEmail(token, email):
 def postMessage(token, email):
     signedInEmail = database_helper.getUserEmailByToken(token)
     if signedInEmail is not None:
-        if validEmail(email) == False:
+        if emailExists(email):
             if len(request.form['message']) > 0:
-                database_helper.insertMessage(signedInEmail[0], email, request.form['message'])
+                database_helper.insertMessage(signedInEmail, email, request.form['message'])
                 return json.dumps({'success': True, 'message': 'Message posted.'}), 200
             else:
                 return json.dumps({'success': False, 'message': 'Form data missing or incorrect type.'}), 404
