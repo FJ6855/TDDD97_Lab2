@@ -41,11 +41,11 @@ def createToken():
     return token
 
 def validLogin(email, password):
-    user = database_helper.getUserPasswordByEmail(email)
-    if user is None:
+    passwordHash = database_helper.getUserPasswordByEmail(email)
+    if passwordHash is None:
         return False
     else:
-        if bcrypt.check_password_hash(user[0], password):
+        if bcrypt.check_password_hash(passwordHash, password):
             return True
         else:
             return False    
@@ -103,7 +103,7 @@ def changePassword(token):
     if form.validate():
         email = database_helper.getUserEmailByToken(token)
         if email is not None:
-            if validLogin(email[0], request.form['oldPassword']):
+            if validLogin(email, request.form['oldPassword']):
                 passwordHash = bcrypt.generate_password_hash(request.form['newPassword'])
                 result = database_helper.updateUserPassword(email, passwordHash)
                 if result == True:
@@ -152,8 +152,12 @@ def getUserMessagesByEmail(token, email):
     else:
         return json.dumps({'success': False, 'message': 'You are not signed in.'}), 404
 
-@app.route('/post_message/<token>/<email>', methods=['GET','POST'])
+@app.route('/post_message/<token>', defaults={'email': None}, methods=['POST'])
+@app.route('/post_message/<token>/<email>', methods=['POST'])
 def postMessage(token, email):
+    if email is None:
+        email = database_helper.getUserEmailByToken(token)
+
     signedInEmail = database_helper.getUserEmailByToken(token)
     if signedInEmail is not None:
         if emailExists(email):
