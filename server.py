@@ -13,17 +13,15 @@ bcrypt = Bcrypt(app)
 class SignUpForm(Form):
     firstName = TextField('First name', [validators.Required()])
     lastName = TextField('Last name', [validators.Required()])
-    gender = TextField('Gender', [validators.Required()])
+    gender = TextField('Gender', [validators.Required(), validators.AnyOf(values=['Male', 'Female'])])
     city = TextField('City', [validators.Required()])
     country = TextField('Country', [validators.Required()])
     signupEmail = TextField('Email', [validators.Required(), validators.Email()])
-    signupPassword = PasswordField('Password', [validators.Required(), validators.Length(min=6), validators.EqualTo('repeatPassword', message='Password doesn\'t match')])
-    repeatPassword = PasswordField('Repeat password', [validators.Required()])
+    signupPassword = PasswordField('Password', [validators.Required(), validators.Length(min=6)])
 
 class ChangePasswordForm(Form):
-    oldPassword = PasswordField('Old password', [validators.Required(), validators.Length(min=6)])
-    newPassword = PasswordField('Repeat password', [validators.Required(), validators.Length(min=6), validators.EqualTo('repeatNewPassword', message='Password doesn\'t match')])
-    repeatNewPassword = PasswordField('Repeat password', [validators.Required()])
+    oldPassword = PasswordField('Old password', [validators.Required()])
+    newPassword = PasswordField('Repeat password', [validators.Required(), validators.Length(min=6)])
 
 @app.before_request
 def beforeRequest():
@@ -65,9 +63,9 @@ def signIn():
         if result == True:
             return json.dumps({'success': True, 'message': 'Successfully signed in.', 'data': token}), 200
         else:
-            return json.dumps({'success': False, 'message': 'Could not sign in user.'}), 501
+            return json.dumps({'success': False, 'message': 'Could not sign in user.'}), 503
     else:
-        return json.dumps({'success': False, 'message': 'Wrong username or password.'}), 404
+        return json.dumps({'success': False, 'message': 'Wrong username or password.'}), 400
 
 @app.route('/sign_up', methods=['POST'])
 def signUp():
@@ -79,11 +77,11 @@ def signUp():
             if result == True:            
                 return json.dumps({'success': True, 'message': 'Successfully created a new user.'}), 200
             else:
-                return json.dumps({'success': False, 'message': 'Could not create user.'}), 501
+                return json.dumps({'success': False, 'message': 'Could not create user.'}), 503
         else:
-            return json.dumps({'success': False, 'message': 'User already exists.'}), 404
+            return json.dumps({'success': False, 'message': 'User already exists.'}), 400
     else:
-        return json.dumps({'success': False, 'message': 'Form data missing or incorrect type.'}), 404
+        return json.dumps({'success': False, 'message': 'Form data missing or incorrect type.'}), 400
 
 @app.route('/sign_out/<token>', methods=['GET'])
 def signOut(token):
@@ -93,9 +91,9 @@ def signOut(token):
         if result == True:
             return json.dumps({'success': True, 'message': 'Successfully signed out.'}), 200
         else:
-            return json.dumps({'success': False, 'message': 'Could not delete signed in user.'}), 501
+            return json.dumps({'success': False, 'message': 'Could not delete signed in user.'}), 503
     else:
-        return json.dumps({'success': False, 'message': 'You are not signed in.'}), 404
+        return json.dumps({'success': False, 'message': 'You are not signed in.'}), 405
             
 @app.route('/change_password/<token>', methods=['GET', 'POST'])
 def changePassword(token):
@@ -109,13 +107,13 @@ def changePassword(token):
                 if result == True:
                     return json.dumps({'success': True, 'message': 'Password changed.'}), 200
                 else:
-                    return json.dumps({'success': False, 'message': 'Could not update password.'}), 501
+                    return json.dumps({'success': False, 'message': 'Could not update password.'}), 503
             else:
-                return json.dumps({'success': False, 'message': 'Wrong password.'}), 404
+                return json.dumps({'success': False, 'message': 'Wrong password.'}), 400
         else:
-            return json.dumps({'success': False, 'message': 'You are not signed in.'}), 404
+            return json.dumps({'success': False, 'message': 'You are not signed in.'}), 405
     else:
-        return json.dumps({'success': False, 'message': 'Form data missing or incorrect type.'}), 404
+        return json.dumps({'success': False, 'message': 'Form data missing or incorrect type.'}), 400
             
 @app.route('/get_user_data/<token>', defaults={'email': None}, methods=['GET'])
 @app.route('/get_user_data/<token>/<email>', methods=['GET'])
@@ -131,7 +129,7 @@ def getUserData(token, email):
         else:
             return json.dumps({'success': False, 'message': 'No such user.'}), 404
     else:
-        return json.dumps({'success': False, 'message': 'You are not signed in.'}), 404
+        return json.dumps({'success': False, 'message': 'You are not signed in.'}), 405
 
 @app.route('/get_user_messages/<token>', defaults={'email': None}, methods=['GET'])
 @app.route('/get_user_messages/<token>/<email>', methods=['GET'])
@@ -150,14 +148,10 @@ def getUserMessagesByEmail(token, email):
         else:
             return json.dumps({'success': False, 'message': 'No such user.'}), 404
     else:
-        return json.dumps({'success': False, 'message': 'You are not signed in.'}), 404
+        return json.dumps({'success': False, 'message': 'You are not signed in.'}), 405
 
-@app.route('/post_message/<token>', defaults={'email': None}, methods=['POST'])
 @app.route('/post_message/<token>/<email>', methods=['POST'])
 def postMessage(token, email):
-    if email is None:
-        email = database_helper.getUserEmailByToken(token)
-
     signedInEmail = database_helper.getUserEmailByToken(token)
     if signedInEmail is not None:
         if emailExists(email):
@@ -165,11 +159,11 @@ def postMessage(token, email):
                 database_helper.insertMessage(signedInEmail, email, request.form['message'])
                 return json.dumps({'success': True, 'message': 'Message posted.'}), 200
             else:
-                return json.dumps({'success': False, 'message': 'Form data missing or incorrect type.'}), 404
+                return json.dumps({'success': False, 'message': 'Form data missing or incorrect type.'}), 400
         else:
             return json.dumps({'success': False, 'message': 'No such user.'}), 404
     else:
-        return json.dumps({'success': False, 'message': 'You are not signed in.'}), 404
+        return json.dumps({'success': False, 'message': 'You are not signed in.'}), 405
 
 if __name__ == '__main__':
     app.run(debug=True)
